@@ -70,7 +70,6 @@ def load_json(path, default):
     except:
         return default
  
-# Вспомогательная функция безопасного сохранения для предотвращения поломки JSON при перезагрузках
 def save_json(path, data):
     try:
         temp_path = path + ".tmp"
@@ -314,7 +313,7 @@ def calc_signal_1t(home_id, away_id, league_id):
 
 def signal_level(pct):
     if pct >= 82:
-        return "🔥🔥 СИЛЬНЫЙ"
+        return "🔥 СИЛЬНЫЙ"
     elif pct >= 72:
         return "⚡ СРЕДНИЙ"
     else:
@@ -475,16 +474,11 @@ def odds_monitor_loop():
                 level = signal_level(m["rate"])
 
                 msg_lines = [
-                    f"🟢 *НОВЫЙ СИГНАЛ* | {league_line}",
-                    "━━━━━━━━━━━━━━━━━━━━━━",
-                    f"⚽ *МАТЧ:* {m['home_ru']} — {m['away_ru']}",
-                    f"⏰ *НАЧАЛО:* `{m['time']}` МСК",
-                    "━━━━━━━━━━━━━━━━━━━━━━",
-                    f"📈 *Аналитика:* {m['rate']}% (Уровень: {level})",
-                    f"💰 *Стартовый КФ:* `{odds_str}`",
-                    "━━━━━━━━━━━━━━━━━━━━━━",
-                    "🔥 *СТАВКА:* `Тотал 1-го тайма Больше (0.5)`",
-                    "⚠️ _Рекомендуемый флэт: 1-2% от банка_",
+                    f"🟢 *1 ТАЙМ — ТБ 0.5* | {league_line}",
+                    f"⚽ *Матч:* {m['home_ru']} — {m['away_ru']}",
+                    f"⏰ *Начало:* `{m['time']}` МСК | *КФ:* `{odds_str}`",
+                    f"📊 *Аналитика:* {m['rate']}% ({level})",
+                    f"🎯 *Ставка:* `Тотал 1Т Больше (0.5)`"
                 ]
                 text = "\n".join(msg_lines)
 
@@ -520,11 +514,10 @@ def odds_monitor_loop():
 
         time.sleep(ODDS_CHECK_INTERVAL)  
 
-# ================== ОПТИМИЗИРОВАННАЯ ОТПРАВКА TELEGRAM (БЕЗ ОШИБОК ДЛИНЫ) ==================
+# ================== ОПТИМИЗИРОВАННАЯ ОТПРАВКА TELEGRAM ==================
 def send(text, specific_chat_id=None):
     target_chats = [specific_chat_id] if specific_chat_id else CHANNELS
     
-    # ФУНКЦИЯ ДЕЛЕНИЯ ТЕКСТА: Если отчет слишком длинный, режем его строго по переносу строк
     def split_message(msg, max_length=4000):
         if len(msg) <= max_length:
             return [msg]
@@ -612,16 +605,11 @@ def live_first_half_monitor():
                 odds_str = f"{odds:.2f}" if odds is not None else f"от {MIN_ODDS}"
                 
                 live_1t_lines = [
-                    f"⚡ *LIVE СИГНАЛ (1-Й ТАЙМ)* | {league_line}",
-                    "━━━━━━━━━━━━━━━━━━━━━━",
-                    f"⏱ *Минута матча:* `{elapsed}-я мин` | Счет: `0 : 0`",
-                    f"⚔ *ИГРАЮТ:* {translate_team(match['teams']['home']['name'])} — {translate_team(match['teams']['away']['name'])}",
-                    "━━━━━━━━━━━━━━━━━━━━━━",
-                    f"📊 *Вероятность гола в 1Т:* {final_prob}% (Уровень: {level})",
-                    f"💰 *Коэффициент в БК:* `{odds_str}`",
-                    "━━━━━━━━━━━━━━━━━━━━━━",
-                    "🎯 *СТАВКА:* `Тотал 1-го тайма Больше (0.5)`",
-                    "💵 _Идеальная точка входа прямо сейчас!_",
+                    f"⚡ *LIVE 1 ТАЙМ — ТБ 0.5* | {league_line}",
+                    f"⚔ *Mатч:* {translate_team(match['teams']['home']['name'])} — {translate_team(match['teams']['away']['name'])}",
+                    f"⏱ *Минута:* `{elapsed}-я мин` | Счет: `0:0` | *КФ:* `{odds_str}`",
+                    f"📊 *Аналитика:* {final_prob}% ({level})",
+                    f"🎯 *Ставка:* `Тотал 1Т Больше (0.5)`"
                 ]
                 text = "\n".join(live_1t_lines)
                 send(text)
@@ -759,23 +747,23 @@ def live_second_half_monitor():
                 if final < LIVE_SECOND_HALF_THRESHOLD:
                     continue
 
+                # СТРАТЕГИЧЕСКАЯ ЗАДЕРЖКА: Ждём 12 минут, чтобы выдать сигнал перед самым стартом 2-го тайма
+                print(f"⏳ Матч {translate_team(home_raw)} в перерыве подходит по условиям. Замораживаем сигнал на 12 минут, чтобы выдать строго перед стартом 2Т...")
+                time.sleep(720)
+
+                # Повторно проверяем КФ в самом конце перерыва
                 odds = get_second_half_over_odds(match_id)
-                print(f"🔍 Live 2Т {translate_team(home_raw)} — {translate_team(away_raw)}: КФ={odds}")
+                print(f"🔍 Конец перерыва! Live 2Т {translate_team(home_raw)} — {translate_team(away_raw)}: КФ={odds}")
 
                 league_line = format_league_line(country, league_name)
                 odds_str = f"{odds:.2f}" if odds is not None else f"в Live при КФ от {MIN_ODDS}"
 
                 live_msg_lines = [
-                    f"🚨 *LIVE СИГНАЛ* | {league_line}",
-                    "━━━━━━━━━━━━━━━━━━━━━━",
-                    "👑 *Счет после 1Т:* `0 : 0` (Перерыв)",
-                    f"⚔️ *ИГРАЮТ:* {translate_team(home_raw)} — {translate_team(away_raw)}",
-                    "━━━━━━━━━━━━━━━━━━━━━━",
+                    f"🚨 *LIVE СИГНАЛ ПОСЛЕ 1Т 0:0* | {league_line}",
+                    f"⚔️ *Матч:* {translate_team(home_raw)} — {translate_team(away_raw)}",
+                    f"👑 *Положение:* `0:0 в перерыве` | *КФ:* `{odds_str}`",
                     f"📊 *Вероятность гола во 2Т:* {final * 100:.1f}%",
-                    f"💰 *Текущий КФ:* `{odds_str}`",
-                    "━━━━━━━━━━━━━━━━━━━━━━",
-                    "🎯 *СТАВКА:* `Гол во 2-м тайме (ТБ 0.5)`",
-                    "💵 _Ждем КФ для максимальной выгоды!_",
+                    f"🎯 *Ставка:* `Тотал 2Т Больше (0.5)`"
                 ]
                 text = "\n".join(live_msg_lines)
                 
@@ -883,23 +871,20 @@ def build_report_text(target_date):
     wins = [m for m in day_matches if m["result"] == "win"]
     losses = [m for m in day_matches if m["result"] == "loss"]
     win_rate = round(len(wins) / len(day_matches) * 100) if day_matches else 0
+    
     report_lines = [
         f"📊 *ИТОГИ ДНЯ — {target_date}*",
-        f"Всего сигналов: *{len(day_matches)}*",
-        f"✅ Выиграло: *{len(wins)}* |  ❌ Проиграло: *{len(losses)}*",
-        f"📈 Итоговая точность: *{win_rate}%*",
-        "━━━━━━━━━━━━━━━━━━━━━━━\n",
-        "🔥 *СИГНАЛЫ НА 1 ТАЙМ (ТБ 0.5 в 1Т):*"
+        f"Всего сигналов: *{len(day_matches)}* (✅ Выиграло: *{len(wins)}* | ❌ Проиграло: *{len(losses)}*)",
+        f"📈 Точность за день: *{win_rate}%*",
+        "\n🔸 *СИГНАЛЫ НА 1 ТАЙМ (ТБ 0.5):*"
     ]
     if not matches_1t:
         report_lines.append("  _Сигналов не было_")
     for m in matches_1t:
         icon = "✅" if m["result"] == "win" else "❌" if m["result"] == "loss" else "⏳"
         report_lines.append(f"  {icon} {m['home']} — {m['away']} (`{m['time']}`) -> счет 1Т: `{m.get('ht_score', '0:0')}`")
-    report_lines.extend([
-        "\n━━━━━━━━━━━━━━━━━━━━━━━\n",
-        "🚨 *LIVE СИГНАЛЫ НА 2 ТАЙМ (Гол во 2Т):*"
-    ])
+        
+    report_lines.append("\n🔸 *LIVE СИГНАЛЫ НА 2 ТАЙМ (ТБ 0.5 во 2Т):*")
     if not matches_2t:
         report_lines.append("  _Сигналов не было_")
     for m in matches_2t:
@@ -943,24 +928,24 @@ def telegram_commands_loop():
                     continue
                 
                 if text == "/start":
-                    send("👋 Привет! Я твой футбольный аналитический бот. Работаю полностью автоматически, но готов выполнять команды:\n\n"
-                         "📋 `/queue` — Посмотреть матчи в текущей очереди\n"
-                         "📊 `/stats` — Посмотреть статистику за сегодня", specific_chat_id=CHAT_ID)
+                    send("👋 Привет Санта! Я твой футбольный бот.\n\n"
+                         "📋 `/queue` — Очередь прематча\n"
+                         "📊 `/stats` — Статистика за сегодня", specific_chat_id=CHAT_ID)
                 
                 elif text == "/queue":
                     with queue_lock:
                         q = list(match_queue)
                     if not q:
-                        send("📋 *Очередь прематч-мониторинга пуста.*\nОстальные матчи отслеживаются в Лайве.", specific_chat_id=CHAT_ID)
+                        send("📋 *Очередь прематч-мониторинга пуста.*\nВсе матчи отслеживаются в Лайве.", specific_chat_id=CHAT_ID)
                     else:
-                        lines = ["📋 *МАТЧИ В ОЧЕРЕДИ НА ПРЕМАТЧ-МОНИТОРИНГ КФ:*"]
+                        lines = ["📋 *ОЧЕРЕДЬ ПРЕМАТЧ-МОНИТОРИНГА:*"]
                         for index, m in enumerate(q, 1):
-                            lines.append(f"{index}. `{m['time']}` *{m['home_ru']} — {m['away_ru']}* (Вероятность: {m['rate']}%)")
+                            lines.append(f"{index}. `{m['time']}` *{m['home_ru']} — {m['away_ru']}* ({m['rate']}%)")
                         send("\n".join(lines), specific_chat_id=CHAT_ID)
                         
                 elif text == "/stats":
                     today_str = datetime.now(MSK).strftime("%Y-%m-%d")
-                    send("⏳ _Собираю актуальные данные по сыгранным матчам..._", specific_chat_id=CHAT_ID)
+                    send("⏳ _Собираю актуальные данные..._", specific_chat_id=CHAT_ID)
                     current_report = build_report_text(today_str)
                     send(current_report, specific_chat_id=CHAT_ID)
                     
