@@ -70,9 +70,16 @@ def load_json(path, default):
     except:
         return default
  
+# Вспомогательная функция безопасного сохранения для предотвращения поломки JSON при перезагрузках
 def save_json(path, data):
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+    try:
+        temp_path = path + ".tmp"
+        with open(temp_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        import os
+        os.replace(temp_path, path)
+    except Exception as e:
+        print(f"Ошибка сохранения файла {path}: {e}")
  
 # ================== ИНИЦИАЛИЗАЦИЯ ==================
 bot = Bot(token=TOKEN)
@@ -513,18 +520,37 @@ def odds_monitor_loop():
 
         time.sleep(ODDS_CHECK_INTERVAL)  
 
-# ================== ОТПРАВКА TELEGRAM ==================
+# ================== ОПТИМИЗИРОВАННАЯ ОТПРАВКА TELEGRAM (БЕЗ ОШИБОК ДЛИНЫ) ==================
 def send(text, specific_chat_id=None):
     target_chats = [specific_chat_id] if specific_chat_id else CHANNELS
+    
+    # ФУНКЦИЯ ДЕЛЕНИЯ ТЕКСТА: Если отчет слишком длинный, режем его строго по переносу строк
+    def split_message(msg, max_length=4000):
+        if len(msg) <= max_length:
+            return [msg]
+        parts = []
+        while msg:
+            if len(msg) <= max_length:
+                parts.append(msg)
+                break
+            split_idx = msg.rfind("\n", 0, max_length)
+            if split_idx == -1:
+                split_idx = max_length
+            parts.append(msg[:split_idx])
+            msg = msg[split_idx:].strip()
+        return parts
+
     for ch in target_chats:
-        try:
-            bot.send_message(chat_id=ch, text=text, parse_mode="Markdown")
-            time.sleep(0.5)
-        except RetryAfter as e:
-            time.sleep(e.retry_after)
-            bot.send_message(chat_id=ch, text=text, parse_mode="Markdown")
-        except Exception as e:
-            print(f"Ошибка отправки в {ch}: {e}")
+        text_parts = split_message(text)
+        for part in text_parts:
+            try:
+                bot.send_message(chat_id=ch, text=part, parse_mode="Markdown")
+                time.sleep(0.5)
+            except RetryAfter as e:
+                time.sleep(e.retry_after)
+                bot.send_message(chat_id=ch, text=part, parse_mode="Markdown")
+            except Exception as e:
+                print(f"Ошибка отправки в {ch}: {e}")
  
 # ================== ЦИКЛ ОБНОВЛЕНИЯ МАТЧЕЙ ==================
 def loader_loop():
@@ -782,7 +808,7 @@ def live_second_half_monitor():
                 time.sleep(6)
  
         except Exception as e:
-            print(f"Ошибка live мониторинга: {e}")
+            print(f"Ошибка live monitoring 2Т: {e}")
  
         time.sleep(LIVE_CHECK_INTERVAL)
  
